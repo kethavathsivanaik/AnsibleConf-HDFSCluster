@@ -1,0 +1,57 @@
+- hosts: localhost
+  vars_files: 
+  - secure.yml
+  vars_prompt: 
+  #  - name: masternodes
+  #  prompt: Number of NameNodes want to Launch in AWS :? 
+  #  private: false
+  - name: datanodes
+    prompt: Number of DataNodes want to Launch in AWS :?  
+    private: false 
+  pre_tasks:
+  - name: Provision NameNode in AWS
+    ec2:
+      instance_tags:
+        Name: NameNode 
+      key_name: "keypair_docker_webserver"
+      instance_type: "t2.micro"
+      image: "ami-09a7bbd08886aafdf"
+      wait: yes
+      count: 1
+      vpc_subnet_id: "subnet-9e9fa5f6"
+      assign_public_ip: yes
+      state: present
+      region: "ap-south-1"
+      group_id: "sg-009981feddc018ed3"
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"     
+  - name: Provision DataNodes in AWS
+    ec2:
+      instance_tags:
+        Name: DataNode
+      key_name: "keypair_docker_webserver"
+      instance_type: "t2.micro"
+      image: "ami-09a7bbd08886aafdf"
+      wait: yes
+      count: "{{ datanodes }}"
+      vpc_subnet_id: "subnet-9e9fa5f6"
+      assign_public_ip: yes
+      state: present
+      region: "ap-south-1"
+      group_id: "sg-009981feddc018ed3"
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"      
+  - name: Wait to Completely Provision Instances
+    pause:
+      minutes: 2
+  - name: Refresh Inventory
+    meta: refresh_inventory
+- hosts: tag_Name_NameNode
+  roles: 
+  - role: NameNode
+- hosts: tag_Name_DataNode
+  roles:
+  - role: DataNode
+            
+
+
