@@ -1,0 +1,99 @@
+---
+# tasks file for DataNode
+  - include_vars: vault.yml
+
+  - name: Install pip 
+    package: 
+      name: python-pip
+
+  - name: Install boto3 
+    pip: 
+      name: 
+      - boto
+      - boto3
+  - name: Download Hadoop
+    aws_s3:
+      bucket: hadoop-software-ansible
+      object: /hadoop-1.2.1.rpm
+      dest: /home/ec2-user/hadoop-1.2.1.rpm 
+      mode: get
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"
+      region: "ap-south-1"
+
+  - name: Download Dependencies - Java
+    aws_s3:
+      bucket: hadoop-software-ansible
+      object: /jdk-8u171.rpm
+      dest: /home/ec2-user/jdk-8u171.rpm
+      mode: get
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"
+      region: "ap-south-1"
+
+
+  - name: Installing Hadoop Dependencies
+    yum:
+      name:  /home/ec2-user/jdk-8u171.rpm
+      state: present
+  - name: Installing Hadoop
+    shell: rpm -i  /home/ec2-user/hadoop-1.2.1.rpm --force
+
+  - name: Create Directory 
+    file:
+      path: /namenode
+      state: directory
+    register: namenode_dir_created 
+  
+  - name: Ensure core-site configuration 
+    shell: cat /etc/hadoop/core-site.xml
+    register: core_site_file
+      
+  - name: Configure core-site.xml
+    lineinfile: 
+      path: /etc/hadoop/core-site.xml
+      insertafter: '^<configuration>'
+      line: "<property>\n<name>fs.default.name</name>\n<value>hdfs://0.0.0.0:9001</value>\n</property>"
+    notify: Refresh
+    when: "'<property>\n<name>fs.default.name</name>\n<value>hdfs://0.0.0.0:9001</value>\n</property>' not in core_site_file.stdout"
+
+  - name: Ensure hdfs-site configuration 
+    shell: cat /etc/hadoop/hdfs-site.xml
+    register: hdfs_site_file
+
+  - name: Configuring hdfs-site.xml
+    lineinfile:
+      path: /etc/hadoop/hdfs-site.xml
+      insertafter: '^<configuration>'
+      line: "<property>\n<name>dfs.name.dir</name>\n<value>/namenode</value>\n</property>"
+    notify: Refresh
+    when: "'<property>\n<name>dfs.name.dir</name>\n<value>/namenode</value>\n</property>' not in hdfs_site_file.stdout"
+
+  - name: Format Name Node
+    shell: echo Y | hadoop namenode -format 
+    when: namenode_dir_created.changed == true
+
+  - name: Ensure Hadoop is running 
+    shell: jps
+    become: true
+    register: hadoop_namenode_state
+  
+  - name: Print
+    debug:
+      var: hadoop_namenode_state
+
+  - name: Start Service 
+    shell: hadoop-daemon.sh start namenode
+    when: "'NameNode' not in hadoop_namenode_state.stdout"
+
+  - name: Save Public IP
+    shell:  curl ifconfig.me
+    register: public_ip_namenode
+
+  - name: Copy Public IP in file
+    copy: 
+      content: "{{ public_ip_namenode.stdout }}"
+      dest: public_ip
+    delegate_to: localhost
+
+

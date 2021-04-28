@@ -1,0 +1,8 @@
+---
+# handlers file for NameNode
+#
+  - name: Refresh
+    service:
+      name: hadoop
+      state: restarted
+    when: false
