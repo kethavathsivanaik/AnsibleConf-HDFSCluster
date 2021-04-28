@@ -1,0 +1,5 @@
+---
+# defaults file for DataNode
+#
+#masternodes: 1
+#namenodes: 2

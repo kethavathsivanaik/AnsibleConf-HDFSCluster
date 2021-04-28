@@ -1,0 +1,89 @@
+---
+# tasks file for DataNode
+#
+  - include_vars: vault.yml
+  - name: Install pip
+    package:
+      name: python-pip
+
+  - name: Install boto3
+    pip:
+      name: 
+      - boto
+      - boto3
+
+  - name: Download Hadoop
+    aws_s3:
+      bucket: hadoop-software-ansible
+      object: /hadoop-1.2.1.rpm
+      dest: /home/ec2-user/hadoop-1.2.1.rpm
+      mode: get
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"
+      region: "ap-south-1"
+
+  - name: Download Dependencies - Java
+    aws_s3:
+      bucket: hadoop-software-ansible
+      object: /jdk-8u171.rpm
+      dest: /home/ec2-user/jdk-8u171.rpm
+      mode: get           
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"
+      region: "ap-south-1"
+
+  - name: Installing Hadoop Dependencies
+    yum: 
+      name:  /home/ec2-user/jdk-8u171.rpm
+      state: present
+
+  - name: Installing Hadoop
+    shell: rpm  -i  /home/ec2-user/hadoop-1.2.1.rpm  --force
+
+  - name: Create Directory 
+    file:
+      path: /datanode
+      state: directory
+
+  - name: Public IP of Master
+    shell: cat public_ip
+    register: public_ip_namdenode
+    delegate_to: localhost
+
+  - name: Ensure core-site configuration
+    shell: cat /etc/hadoop/core-site.xml
+    register: core_site_file
+
+  - name: Configure core-site.xml
+    lineinfile: 
+      path: /etc/hadoop/core-site.xml
+      insertafter: '^<configuration>'
+      line: "<property>\n<name>fs.default.name</name>\n<value>hdfs://{{ public_ip_namdenode.stdout }}:9001</value>\n</property>"
+    notify: Refresh
+    when: "'<property>\n<name>fs.default.name</name>\n' not in core_site_file.stdout"
+
+  - name: Ensure hdfs-site configuration
+    shell: cat /etc/hadoop/hdfs-site.xml
+    register: hdfs_site_file
+
+    
+  - name: Configure hdfs-site.xml
+    lineinfile:
+      path: /etc/hadoop/hdfs-site.xml
+      insertafter: '^<configuration>'
+      line: "<property>\n<name>dfs.data.dir</name>\n<value>/datanode</value>\n</property>"
+    notify: Refresh
+    when: "'<property>\n<name>dfs.data.dir</name>\n<value>/datanode</value>\n</property>' not in hdfs_site_file.stdout"
+
+
+  - name: Ensure DataNode is Running
+    command: jps
+    become: true
+    register: hadoop_datanode_state
+
+  - name: Start Service 
+    shell: hadoop-daemon.sh start datanode
+    when: "'DataNode not in hadoop_datanode_state'"
+
+
+
