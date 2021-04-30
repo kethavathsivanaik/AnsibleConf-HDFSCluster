@@ -46,8 +46,8 @@
       state: directory
 
   - name: Public IP of Master
-    shell: cat public_ip
-    register: public_ip_namdenode
+    shell: cat public_ip_namenode
+    register: public_ip_namenode
     delegate_to: localhost
 
   - name: Ensure core-site configuration
@@ -58,7 +58,7 @@
     lineinfile: 
       path: /etc/hadoop/core-site.xml
       insertafter: '^<configuration>'
-      line: "<property>\n<name>fs.default.name</name>\n<value>hdfs://{{ public_ip_namdenode.stdout }}:9001</value>\n</property>"
+      line: "<property>\n<name>fs.default.name</name>\n<value>hdfs://{{ public_ip_namenode.stdout }}:9001</value>\n</property>"
     notify: Refresh
     when: "'<property>\n<name>fs.default.name</name>\n' not in core_site_file.stdout"
 
@@ -83,7 +83,7 @@
 
   - name: Start Service 
     shell: hadoop-daemon.sh start datanode
-    when: "'DataNode not in hadoop_datanode_state'"
+    when: "'DataNode' not in hadoop_datanode_state"
 
 
 
